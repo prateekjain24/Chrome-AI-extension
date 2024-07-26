@@ -3,34 +3,32 @@ let isWaiting = false;
 let pendingQuery = null;
 let lastEditedElement = null;
 
+function attachListeners(element) {
+  element.addEventListener('input', detectInput);
+  element.addEventListener('keydown', handleKeyPress);
+}
+
 function detectInput(event) {
   const element = event.target;
-  if (element.tagName === 'TEXTAREA' || (element.tagName === 'INPUT' && element.type === 'text')) {
-    lastEditedElement = element;
-    const text = element.value;
-    if (text.startsWith(hotword)) {
-      pendingQuery = text.slice(hotword.length).trim();
-    } else {
-      pendingQuery = null;
-    }
+  lastEditedElement = element;
+  const text = element.value || element.textContent;
+  if (text.includes(hotword)) {
+    const parts = text.split(hotword);
+    pendingQuery = parts[parts.length - 1].trim();
+  } else {
+    pendingQuery = null;
   }
 }
 
 function handleKeyPress(event) {
   if (event.key === 'Enter' && event.shiftKey && pendingQuery && !isWaiting && lastEditedElement) {
-    event.preventDefault(); // Prevent the default Shift+Enter behavior
+    event.preventDefault();
+    event.stopPropagation();
     isWaiting = true;
     showLoadingIndicator(lastEditedElement);
     chrome.runtime.sendMessage({action: "queryGroq", query: pendingQuery}, (response) => {
       if (response && response.result) {
-        // Replace only the part of the text that contains the query
-        const fullText = lastEditedElement.value;
-        const queryStartIndex = fullText.lastIndexOf(hotword);
-        const newText = fullText.substring(0, queryStartIndex) + response.result;
-        lastEditedElement.value = newText;
-        
-        // Move cursor to the end of the inserted text
-        lastEditedElement.selectionStart = lastEditedElement.selectionEnd = newText.length;
+        replaceText(lastEditedElement, response.result);
       } else {
         console.error("Error querying Groq API");
       }
@@ -41,20 +39,35 @@ function handleKeyPress(event) {
   }
 }
 
+function replaceText(element, newText) {
+  const fullText = element.value || element.textContent;
+  const hotwordIndex = fullText.lastIndexOf(hotword);
+  const beforeHotword = fullText.substring(0, hotwordIndex);
+  const afterQuery = fullText.substring(hotwordIndex + hotword.length + pendingQuery.length);
+  const updatedText = beforeHotword + newText + afterQuery;
+
+  if (typeof element.value !== 'undefined') {
+    element.value = updatedText;
+  } else {
+    element.textContent = updatedText;
+  }
+
+  // Trigger input event to ensure any listeners on the element are notified
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function showLoadingIndicator(element) {
   const indicator = document.createElement('div');
-  indicator.textContent = 'Loading...';
-  indicator.style.position = 'absolute';
+  indicator.textContent = 'AI is thinking...';
+  indicator.style.position = 'fixed';
   indicator.style.background = 'rgba(0,0,0,0.7)';
   indicator.style.color = 'white';
-  indicator.style.padding = '5px';
-  indicator.style.borderRadius = '3px';
-  indicator.style.fontSize = '12px';
+  indicator.style.padding = '10px';
+  indicator.style.borderRadius = '5px';
+  indicator.style.fontSize = '14px';
   indicator.style.zIndex = '10000';
-  
-  const rect = element.getBoundingClientRect();
-  indicator.style.top = `${rect.bottom + window.scrollY + 5}px`;
-  indicator.style.left = `${rect.left + window.scrollX}px`;
+  indicator.style.top = '20px';
+  indicator.style.right = '20px';
   
   indicator.id = 'ai-loading-indicator';
   document.body.appendChild(indicator);
@@ -67,8 +80,43 @@ function hideLoadingIndicator() {
   }
 }
 
-document.addEventListener('input', detectInput);
-document.addEventListener('keydown', handleKeyPress);
+function observeDOM() {
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.tagName === 'TEXTAREA' || (node.tagName === 'INPUT' && node.type === 'text') || node.contentEditable === 'true') {
+              attachListeners(node);
+            }
+            const textareas = node.querySelectorAll('textarea');
+            const inputs = node.querySelectorAll('input[type="text"]');
+            const editables = node.querySelectorAll('[contenteditable="true"]');
+            textareas.forEach(attachListeners);
+            inputs.forEach(attachListeners);
+            editables.forEach(attachListeners);
+          }
+        });
+      }
+    });
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
+// Initial setup
+document.addEventListener('DOMContentLoaded', () => {
+  const textareas = document.querySelectorAll('textarea');
+  const inputs = document.querySelectorAll('input[type="text"]');
+  const editables = document.querySelectorAll('[contenteditable="true"]');
+  textareas.forEach(attachListeners);
+  inputs.forEach(attachListeners);
+  editables.forEach(attachListeners);
+  observeDOM();
+});
 
 // Listen for hotword updates from the options page
 chrome.storage.onChanged.addListener((changes, namespace) => {

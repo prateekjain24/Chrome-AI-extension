@@ -2,34 +2,32 @@
     "manifest_version": 3,
     "name": "AI Text Enhancer",
     "version": "1.0",
-    "description": "Enhance your text input with AI-generated content using the /ai command and pressing Tab.",
+    "description": "Enhance your text input with AI-generated content using the /ai command and pressing Shift+Enter.",
+    "permissions": [
+      "activeTab",
+      "storage"
+    ],
+    "host_permissions": [
+      "<all_urls>"
+    ],
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["content.js"],
+        "run_at": "document_start"
+      }
+    ],
+    "action": {
+      "default_popup": "popup.html"
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "options_page": "options.html",
     "icons": {
       "16": "icon16.png",
       "32": "icon32.png",
       "48": "icon48.png",
       "128": "icon128.png"
-    },
-    "action": {
-      "default_icon": {
-        "16": "icon16.png",
-        "32": "icon32.png",
-        "48": "icon48.png",
-        "128": "icon128.png"
-      },
-      "default_popup": "popup.html"
-    },
-    "permissions": [
-      "activeTab",
-      "storage"
-    ],
-    "content_scripts": [
-      {
-        "matches": ["<all_urls>"],
-        "js": ["content.js"]
-      }
-    ],
-    "background": {
-      "service_worker": "background.js"
-    },
-    "options_page": "options.html"
+    }
   }
