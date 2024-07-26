@@ -1,26 +1,35 @@
 let hotword = '/ai';
 let isWaiting = false;
+let pendingQuery = null;
 
 function detectInput(event) {
   const element = event.target;
   if (element.tagName === 'TEXTAREA' || (element.tagName === 'INPUT' && element.type === 'text')) {
     const text = element.value;
-    if (text.startsWith(hotword) && !isWaiting) {
-      const query = text.slice(hotword.length).trim();
-      if (query) {
-        isWaiting = true;
-        showLoadingIndicator(element);
-        chrome.runtime.sendMessage({action: "queryGroq", query: query}, (response) => {
-          if (response && response.result) {
-            element.value = response.result;
-          } else {
-            console.error("Error querying Groq API");
-          }
-          hideLoadingIndicator(element);
-          isWaiting = false;
-        });
-      }
+    if (text.startsWith(hotword)) {
+      pendingQuery = text.slice(hotword.length).trim();
+    } else {
+      pendingQuery = null;
     }
+  }
+}
+
+function handleTabPress(event) {
+  if (event.key === 'Tab' && pendingQuery && !isWaiting) {
+    event.preventDefault(); // Prevent the default Tab behavior
+    const element = event.target;
+    isWaiting = true;
+    showLoadingIndicator(element);
+    chrome.runtime.sendMessage({action: "queryGroq", query: pendingQuery}, (response) => {
+      if (response && response.result) {
+        element.value = response.result;
+      } else {
+        console.error("Error querying Groq API");
+      }
+      hideLoadingIndicator(element);
+      isWaiting = false;
+      pendingQuery = null;
+    });
   }
 }
 
@@ -51,6 +60,7 @@ function hideLoadingIndicator() {
 }
 
 document.addEventListener('input', detectInput);
+document.addEventListener('keydown', handleTabPress);
 
 // Listen for hotword updates from the options page
 chrome.storage.onChanged.addListener((changes, namespace) => {
