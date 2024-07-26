@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "AI Text Enhancer",
     "version": "1.0",
-    "description": "Enhance your text input with AI-generated content using the /ai command and pressing Shift+Enter.",
+    "description": "Enhance your text input with AI-generated content using the /ai command and clicking the AI Enhance button.",
     "permissions": [
       "activeTab",
       "storage"
