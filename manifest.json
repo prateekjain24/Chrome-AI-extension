@@ -1,0 +1,33 @@
+{
+    "manifest_version": 3,
+    "name": "AI Text Enhancer",
+    "version": "1.0",
+    "description": "Enhance your text input with AI-generated content using the /ai command.",
+    "icons": {
+      "16": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    },
+    "action": {
+      "default_icon": {
+        "16": "icon.svg",
+        "24": "icon.svg",
+        "32": "icon.svg"
+      },
+      "default_popup": "popup.html"
+    },
+    "permissions": [
+      "activeTab",
+      "storage"
+    ],
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["content.js"]
+      }
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "options_page": "options.html"
+  }
