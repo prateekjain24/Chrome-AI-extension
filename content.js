@@ -1,10 +1,12 @@
 let hotword = '/ai';
 let isWaiting = false;
 let pendingQuery = null;
+let lastEditedElement = null;
 
 function detectInput(event) {
   const element = event.target;
   if (element.tagName === 'TEXTAREA' || (element.tagName === 'INPUT' && element.type === 'text')) {
+    lastEditedElement = element;
     const text = element.value;
     if (text.startsWith(hotword)) {
       pendingQuery = text.slice(hotword.length).trim();
@@ -14,19 +16,25 @@ function detectInput(event) {
   }
 }
 
-function handleTabPress(event) {
-  if (event.key === 'Tab' && pendingQuery && !isWaiting) {
-    event.preventDefault(); // Prevent the default Tab behavior
-    const element = event.target;
+function handleKeyPress(event) {
+  if (event.key === 'Enter' && event.shiftKey && pendingQuery && !isWaiting && lastEditedElement) {
+    event.preventDefault(); // Prevent the default Shift+Enter behavior
     isWaiting = true;
-    showLoadingIndicator(element);
+    showLoadingIndicator(lastEditedElement);
     chrome.runtime.sendMessage({action: "queryGroq", query: pendingQuery}, (response) => {
       if (response && response.result) {
-        element.value = response.result;
+        // Replace only the part of the text that contains the query
+        const fullText = lastEditedElement.value;
+        const queryStartIndex = fullText.lastIndexOf(hotword);
+        const newText = fullText.substring(0, queryStartIndex) + response.result;
+        lastEditedElement.value = newText;
+        
+        // Move cursor to the end of the inserted text
+        lastEditedElement.selectionStart = lastEditedElement.selectionEnd = newText.length;
       } else {
         console.error("Error querying Groq API");
       }
-      hideLoadingIndicator(element);
+      hideLoadingIndicator();
       isWaiting = false;
       pendingQuery = null;
     });
@@ -60,7 +68,7 @@ function hideLoadingIndicator() {
 }
 
 document.addEventListener('input', detectInput);
-document.addEventListener('keydown', handleTabPress);
+document.addEventListener('keydown', handleKeyPress);
 
 // Listen for hotword updates from the options page
 chrome.storage.onChanged.addListener((changes, namespace) => {
